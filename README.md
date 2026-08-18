@@ -71,7 +71,7 @@ Since NexusDrop is purely static, you can run it right now without installing a 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/NexusDrop.git
+   git clone https://github.com/vijaytheegala/NexusDrop.git
    ```
 2. **Run Locally or via GitHub Pages:**
    Simply double-click `index.html` to open it in your browser, or host it on GitHub Pages for global access.
