@@ -6,10 +6,17 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
 const btnCloseSidebar = document.getElementById('btn-close-sidebar');
 const storedRoomsList = document.getElementById('stored-rooms-list');
-const btnNewLocal = document.getElementById('btn-new-local');
 
-const unsecuredBanner = document.getElementById('unsecured-banner');
-const btnBannerSecure = document.getElementById('btn-banner-secure');
+const initialBootUi = document.getElementById('initial-boot-ui');
+const bootBtnConnect = document.getElementById('boot-btn-connect');
+const bootBtnInit = document.getElementById('boot-btn-init');
+
+const dbInitNameInput = document.getElementById('db-init-name-input');
+const knownDbsSelect = document.getElementById('known-dbs-select');
+const modalRoomPassword = document.getElementById('modal-room-password');
+const roomPasswordInput = document.getElementById('room-password-input');
+const btnExecuteRoomPassword = document.getElementById('btn-execute-room-password');
+const roomPasswordStatus = document.getElementById('room-password-status');
 
 const modalHost = document.getElementById('modal-host');
 const modalJoin = document.getElementById('modal-join');
@@ -18,8 +25,6 @@ const modalDbConnect = document.getElementById('modal-db-connect');
 
 const btnShowHostModal = document.getElementById('btn-show-host-modal');
 const btnShowJoinModal = document.getElementById('btn-show-join-modal');
-const btnShowDbInit = document.getElementById('btn-show-db-init');
-const btnShowDbConnect = document.getElementById('btn-show-db-connect');
 const closeModals = document.querySelectorAll('.btn-close-modal');
 
 const hostNameInput = document.getElementById('host-name-input');
@@ -91,8 +96,36 @@ let wakeLock = null;
 let currentRoom = null; 
 
 // --- Boot & Event Listeners ---
+
+function populateKnownDbs() {
+    const dbs = JSON.parse(localStorage.getItem('knownDatabases') || '[]');
+    if(knownDbsSelect) {
+        knownDbsSelect.innerHTML = '<option value="">-- Type New PIN Below --</option>';
+        dbs.forEach(db => {
+            const opt = document.createElement('option');
+            opt.value = db.pin;
+            opt.textContent = `${db.name} (${db.pin})`;
+            knownDbsSelect.appendChild(opt);
+        });
+        knownDbsSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('db-connect-pin-input').value = e.target.value;
+            }
+        });
+    }
+}
+
+bootBtnConnect.addEventListener('click', () => {
+    initialBootUi.classList.add('hidden');
+    modalDbConnect.classList.remove('hidden');
+});
+
+bootBtnInit.addEventListener('click', () => {
+    initialBootUi.classList.add('hidden');
+    modalDbInit.classList.remove('hidden');
+});
+
 async function init() {
-    // Check if device is configured as a persistent DB server
     if (localStorage.getItem('isDatabaseServer') === 'true') {
         const savedPin = localStorage.getItem('databaseServerPin');
         if (savedPin) {
@@ -106,6 +139,12 @@ async function init() {
             startDbServer(savedPin);
             return; // Halt normal chat initialization
         }
+    }
+    
+    // Force Initial Boot UI if not a DB
+    if(initialBootUi) {
+        initialBootUi.classList.remove('hidden');
+        populateKnownDbs();
     }
 
     refreshSidebar();
@@ -170,23 +209,35 @@ function renderSidebarRoom(meta) {
         <div class="room-item-meta">PIN: ${meta.id} | ${meta.isHost ? 'Host' : 'Guest'}</div>
     `;
     div.addEventListener('click', () => {
-        openRoom(meta);
-        if (window.innerWidth < 768) toggleSidebar();
+        if(modalRoomPassword) {
+            modalRoomPassword.classList.remove('hidden');
+            roomPasswordStatus.textContent = '';
+            roomPasswordInput.value = '';
+            roomPasswordInput.focus();
+            
+            // Handle unlock
+            let newBtn = btnExecuteRoomPassword.cloneNode(true);
+            btnExecuteRoomPassword.parentNode.replaceChild(newBtn, btnExecuteRoomPassword);
+            btnExecuteRoomPassword = newBtn; // Update reference if needed, but safer to use newBtn directly
+            
+            newBtn.addEventListener('click', () => {
+                if (roomPasswordInput.value === meta.id) {
+                    modalRoomPassword.classList.add('hidden');
+                    openRoom(meta);
+                    if (window.innerWidth < 768) toggleSidebar();
+                } else {
+                    document.getElementById('room-password-status').textContent = 'Incorrect PIN.';
+                }
+            });
+        } else {
+            openRoom(meta);
+            if (window.innerWidth < 768) toggleSidebar();
+        }
     });
     storedRoomsList.appendChild(div);
 }
 
-btnNewLocal.addEventListener('click', () => {
-    openRoom({ id: 'local', name: 'Local Scratchpad', isHost: false });
-    if (window.innerWidth < 768) toggleSidebar();
-});
-
-// --- Room Logic ---
-async function openRoom(roomMeta) {
-    // Disconnect existing
-    cleanupConnections();
-    
-    currentRoom = roomMeta;
+    // Removed local scratchpad init, all logic runs through DB now.
     chatMessages.innerHTML = '';
     cancelReply();
     
@@ -272,60 +323,30 @@ btnShowHostModal.addEventListener('click', openHostModal);
 btnBannerSecure.addEventListener('click', openHostModal);
 btnShowJoinModal.addEventListener('click', openJoinModal);
 
-btnShowDbInit.addEventListener('click', () => {
-    modalDbInit.classList.remove('hidden');
-    dbInitPinInput.value = '';
-    if (window.innerWidth < 768 && sidebar.classList.contains('open')) toggleSidebar();
-});
-
-btnShowDbConnect.addEventListener('click', () => {
-    modalDbConnect.classList.remove('hidden');
-    dbConnectPinInput.value = '';
-    if (window.innerWidth < 768 && sidebar.classList.contains('open')) toggleSidebar();
-});
-
 closeModals.forEach(btn => {
     btn.addEventListener('click', () => {
         modalHost.classList.add('hidden');
         modalJoin.classList.add('hidden');
         modalDbInit.classList.add('hidden');
         modalDbConnect.classList.add('hidden');
+        if(modalRoomPassword) modalRoomPassword.classList.add('hidden');
     });
 });
 
 // --- Hosting Logic ---
-btnExecuteHost.addEventListener('click', async () => {
-    const name = hostNameInput.value.trim() || 'Secure Room';
+btnExecuteHost.addEventListener('click', () => {
+    const name = hostNameInput.value.trim();
     const pin = hostPinInput.value.trim();
-    
-    if (pin.length !== 4 || !/^\d+$/.test(pin)) {
-        hostStatus.textContent = 'Please enter a 4-digit PIN.';
-        return;
-    }
-    
-    modalHost.classList.add('hidden');
-    
-    // If we are currently in 'local' scratchpad, we can optionally migrate those messages to the new room!
-    let migrateHistory = [];
-    if (currentRoom && currentRoom.id === 'local') {
-        migrateHistory = await localforage.getItem(`messages_local`) || [];
-    }
+    if (!name || pin.length !== 4) return;
     
     const newRoom = { id: pin, name: name, isHost: true };
     
     if (activeDbClientConn && activeDbClientConn.open) {
-        // Send create room command to DB Server
         activeDbClientConn.send({ cmd: 'CREATE_ROOM', room: newRoom });
+        modalHost.classList.add('hidden');
     } else {
-        await localforage.setItem(`room_meta_${pin}`, newRoom);
+        hostStatus.textContent = 'You must be connected to a Database Server first.';
     }
-    
-    if (migrateHistory.length > 0) {
-        await localforage.setItem(`messages_${pin}`, migrateHistory);
-        await localforage.removeItem(`messages_local`); // Clear local scratchpad
-    }
-    
-    openRoom(newRoom);
 });
 
 function startHosting(pin) {
@@ -812,16 +833,19 @@ btnExecuteDbConnect.addEventListener('click', () => {
         
         activeDbClientConn.on('open', () => {
             modalDbConnect.classList.add('hidden');
+            
+            // Save to Known DBs
+            const dbs = JSON.parse(localStorage.getItem('knownDatabases') || '[]');
+            if(!dbs.some(d => d.pin === pin)) {
+                dbs.push({ name: 'Cloud Server', pin: pin });
+                localStorage.setItem('knownDatabases', JSON.stringify(dbs));
+            }
+            
+            mainChat.classList.remove('hidden'); // CRITICAL FIX
             alert('Successfully connected to Central Database Server!');
             
             // Fetch Global Rooms
             activeDbClientConn.send({ cmd: 'GET_ROOMS' });
-            
-            // Clean UI
-            btnShowHostModal.classList.add('hidden');
-            btnShowJoinModal.classList.add('hidden');
-            btnShowDbConnect.textContent = `Connected: ${pin}`;
-            btnShowDbConnect.style.background = 'var(--primary)';
         });
         
         activeDbClientConn.on('data', async (data) => {
