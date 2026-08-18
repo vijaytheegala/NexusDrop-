@@ -25,21 +25,65 @@
             </div>
             
             <div class="sidebar-actions">
-                <button id="btn-show-host-modal" class="btn primary btn-sm">Host Room</button>
-                <button id="btn-show-join-modal" class="btn secondary btn-sm">Join Room</button>
+        
+        <div style="margin: 10px 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+            <label for="theme-selector" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 5px;">🎨 Appearance</label>
+            <select id="theme-selector" style="width: 100%; padding: 8px; border-radius: 6px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border); outline: none;">
+                <option value="cyber">🟢 Cyber Hacker</option>
+                <option value="midnight">🔵 Midnight Blue</option>
+                <option value="dracula">🟣 Dracula Dark</option>
+                <option value="light">⚪ Clean Light</option>
+            </select>
+        </div>
+
+        <button id="btn-show-db-connect" class="btn btn-warning" style="margin: 15px; font-weight: bold; animation: pulse 2s infinite;">Connect to DB Server</button>
+            </div>
+            
+            <div class="sidebar-actions" style="border-top: none; padding-top: 0;">
+                <button id="btn-show-host-modal" class="btn secondary btn-sm">Host P2P</button>
+                <button id="btn-show-join-modal" class="btn secondary btn-sm">Join P2P</button>
             </div>
 
             <div class="sidebar-rooms">
-                <h3>> YOUR_ROOMS</h3>
+                <h3>> ROOMS</h3>
                 <div id="stored-rooms-list" class="room-list">
                     <!-- Rooms injected here -->
                 </div>
             </div>
             
             <div class="sidebar-footer">
-                <button id="btn-new-local" class="btn secondary btn-sm" style="width:100%; font-size:0.8rem;">+ New Local Scratchpad</button>
+                <button id="btn-new-local" class="btn secondary btn-sm" style="width:100%; font-size:0.8rem; margin-bottom: 8px;">+ New Local Scratchpad</button>
+                <button id="btn-show-db-init" class="btn-text" style="width:100%; text-align:center; font-size:0.75rem; color: var(--text-muted);">Initialize DB Server Mode</button>
             </div>
         </aside>
+
+        <!-- Server Dashboard Area (Hidden by default) -->
+        <main id="server-dashboard" class="main-chat hidden" style="padding: 20px;">
+            <div style="background: var(--card-bg); border: 1px solid var(--primary); padding: 10px; text-align: center; font-weight: bold; color: var(--primary); margin-bottom: 20px; border-radius: 8px; animation: pulse 2s infinite;">
+                🟢 THIS DEVICE IS WORKING AS A DATABASE SERVER
+            </div>
+            <div class="chat-header" style="justify-content: center; background: #050505;">
+                <h2 style="color: var(--primary); font-family: var(--font-mono);">SERVER DAEMON RUNNING</h2>
+            </div>
+            <div style="padding: 20px; font-family: var(--font-mono); font-size: 0.85rem; color: #0f0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px;">
+                <div style="border: 1px solid #0f0; padding: 16px; border-radius: 8px;">
+                    <h3>DATABASE SERVER ACTIVE</h3>
+                    <p>PIN: <span id="server-pin-display" style="font-size: 1.5rem; font-weight: bold; letter-spacing: 2px;">----</span></p>
+                    <p style="color: var(--text-muted); margin-top: 8px;">Keep this device plugged in and screen awake. It is now serving as the central database.</p>
+                </div>
+                
+                <div style="display: flex; gap: 16px;">
+                    <div style="border: 1px solid var(--border); padding: 12px; flex: 1;">Connected Peers: <span id="server-peers-count">0</span></div>
+                    <div style="border: 1px solid var(--border); padding: 12px; flex: 1;">Total Rooms: <span id="server-rooms-count">0</span></div>
+                </div>
+
+                <div id="server-logs" style="flex: 1; background: #111; padding: 12px; overflow-y: auto; border: 1px solid #333; margin-top: 10px;">
+                    <div>> System initialized. Waiting for connections...</div>
+                </div>
+                
+                <button id="btn-shutdown-server" class="btn danger">SHUTDOWN DAEMON</button>
+            </div>
+        </main>
 
         <!-- Main Chat Area -->
         <main id="main-chat" class="main-chat">
@@ -52,17 +96,19 @@
             </div>
 
             <div class="chat-header">
-                <div class="room-info">
+                <div class="header-left" style="display: flex; align-items: center; gap: 12px;">
                     <button id="btn-toggle-sidebar" class="btn-icon hamburger">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                     </button>
-                    <h2>
-                        <span id="chat-room-name">Local Scratchpad</span> 
-                        <span id="pin-badge-container" class="pin-badge hidden">PIN: <span id="chat-room-pin"></span></span>
-                    </h2>
-                    <div class="status-indicator">
-                        <span class="status-dot"></span> 
-                        <span id="peer-status">OFFLINE (LOCAL ONLY)</span>
+                    <div class="room-info">
+                        <h2>
+                            <span id="chat-room-name">Local Scratchpad</span> 
+                            <span id="pin-badge-container" class="pin-badge hidden">PIN: <span id="chat-room-pin"></span></span>
+                        </h2>
+                        <div class="status-indicator">
+                            <span class="status-dot"></span> 
+                            <span id="peer-status">OFFLINE (LOCAL ONLY)</span>
+                        </div>
                     </div>
                 </div>
                 <div class="header-actions">
@@ -131,18 +177,54 @@
         <div id="modal-join" class="modal hidden">
             <div class="modal-content box">
                 <div class="modal-header">
-                    <h2>Join Room</h2>
+                    <h2>Join P2P Room</h2>
                     <button class="btn-icon btn-close-modal">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                 </div>
-                <p>Enter the access PIN to sync data from the host.</p>
+                <p>Enter the access PIN to connect directly to the room host.</p>
                 <div class="input-group-col">
                     <label for="join-pin-input">Access PIN</label>
                     <input type="text" id="join-pin-input" placeholder="XXXX" maxlength="4" pattern="\d*" style="text-align: center; letter-spacing: 4px; font-weight: 600; font-family: var(--font-mono);">
                 </div>
-                <button id="btn-execute-join" class="btn secondary" style="margin-top: 16px;">Connect</button>
+                <button id="btn-execute-join" class="btn secondary" style="margin-top: 16px;">Connect P2P</button>
                 <div id="join-status" class="status-msg"></div>
+            </div>
+        </div>
+
+        <div id="modal-db-init" class="modal hidden">
+            <div class="modal-content box" style="border-color: var(--warning);">
+                <div class="modal-header">
+                    <h2 style="color: var(--warning);">Init Database Server</h2>
+                    <button class="btn-icon btn-close-modal">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <p>Warning: This will turn this device into a dedicated server hub. The chat UI will be disabled. It must stay online.</p>
+                <div class="input-group-col">
+                    <label for="db-init-pin-input">Server PIN</label>
+                    <input type="text" id="db-init-pin-input" placeholder="XXXX" maxlength="4" pattern="\d*" style="text-align: center; letter-spacing: 4px; font-weight: 600; font-family: var(--font-mono);">
+                </div>
+                <button id="btn-execute-db-init" class="btn primary" style="background: var(--warning); color: #000; margin-top: 16px;">START DAEMON</button>
+                <div id="db-init-status" class="status-msg"></div>
+            </div>
+        </div>
+
+        <div id="modal-db-connect" class="modal hidden">
+            <div class="modal-content box" style="border-color: var(--warning);">
+                <div class="modal-header">
+                    <h2 style="color: var(--warning);">Connect to DB Server</h2>
+                    <button class="btn-icon btn-close-modal">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <p>Connect to your dedicated Database Server to fetch all global rooms and sync data centrally.</p>
+                <div class="input-group-col">
+                    <label for="db-connect-pin-input">Server PIN</label>
+                    <input type="text" id="db-connect-pin-input" placeholder="XXXX" maxlength="4" pattern="\d*" style="text-align: center; letter-spacing: 4px; font-weight: 600; font-family: var(--font-mono);">
+                </div>
+                <button id="btn-execute-db-connect" class="btn primary" style="background: var(--warning); color: #000; margin-top: 16px;">CONNECT</button>
+                <div id="db-connect-status" class="status-msg"></div>
             </div>
         </div>
 

@@ -1,19 +1,51 @@
 :root {
-    --bg-color: #0b0f19;
-    --card-bg: #111827;
-    --sidebar-bg: #0f172a;
-    --text-main: #e2e8f0;
-    --text-muted: #94a3b8;
+    /* Default (Cyber) */
+    --bg-color: #050505;
+    --card-bg: #0f172a;
     --primary: #10b981;
     --primary-hover: #059669;
     --primary-bg: rgba(16, 185, 129, 0.1);
-    --accent: #10b981;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
     --border: #1e293b;
     --error: #ef4444;
     --warning: #f59e0b;
-    
-    --font-ui: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'Fira Code', monospace;
+    --font-mono: 'Courier New', Courier, monospace;
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+[data-theme="midnight"] {
+    --bg-color: #0B1120;
+    --card-bg: #1E293B;
+    --primary: #38BDF8;
+    --primary-hover: #0284C7;
+    --primary-bg: rgba(56, 189, 248, 0.1);
+    --text-main: #F8FAFC;
+    --text-muted: #94A3B8;
+    --border: #334155;
+}
+
+[data-theme="dracula"] {
+    --bg-color: #282A36;
+    --card-bg: #44475A;
+    --primary: #FF79C6;
+    --primary-hover: #FF92DF;
+    --primary-bg: rgba(255, 121, 198, 0.1);
+    --text-main: #F8F8F2;
+    --text-muted: #6272A4;
+    --border: #6272A4;
+}
+
+[data-theme="light"] {
+    --bg-color: #F1F5F9;
+    --card-bg: #FFFFFF;
+    --primary: #2563EB;
+    --primary-hover: #1D4ED8;
+    --primary-bg: rgba(37, 99, 235, 0.1);
+    --text-main: #0F172A;
+    --text-muted: #64748B;
+    --border: #E2E8F0;
+    --warning: #D97706;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,6 +58,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow: hidden;
 }
 
@@ -37,7 +70,9 @@ body {
     width: 100%;
     max-width: 1200px; /* Wider for desktop sidebar */
     height: 100vh;
+    height: 100dvh;
     max-height: 100vh;
+    max-height: 100dvh;
     display: flex;
     position: relative;
     background-color: var(--card-bg);
@@ -175,7 +210,15 @@ body {
     background: var(--card-bg);
 }
 
-.hamburger { margin-right: 12px; }
+.server-log {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #0f0;
+    margin-bottom: 4px;
+    border-bottom: 1px dashed #333;
+    padding-bottom: 4px;
+}
+
 @media (min-width: 768px) { .hamburger { display: none; } }
 
 .room-info {
@@ -285,6 +328,7 @@ input[type="text"]:focus { border-color: var(--primary); }
 
 .message {
     max-width: 85%; padding: 10px 14px; font-size: 0.95rem; line-height: 1.4; word-wrap: break-word; border-radius: 18px; position: relative; transition: transform 0.2s, background-color 0.5s; user-select: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .message.highlight-pulse { animation: highlight-pulse-anim 1.5s ease-out; }
 @keyframes highlight-pulse-anim { 0% { background-color: rgba(16, 185, 129, 0.5); transform: scale(1.02); } 100% { background-color: inherit; transform: scale(1); } }

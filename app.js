@@ -13,8 +13,13 @@ const btnBannerSecure = document.getElementById('btn-banner-secure');
 
 const modalHost = document.getElementById('modal-host');
 const modalJoin = document.getElementById('modal-join');
+const modalDbInit = document.getElementById('modal-db-init');
+const modalDbConnect = document.getElementById('modal-db-connect');
+
 const btnShowHostModal = document.getElementById('btn-show-host-modal');
 const btnShowJoinModal = document.getElementById('btn-show-join-modal');
+const btnShowDbInit = document.getElementById('btn-show-db-init');
+const btnShowDbConnect = document.getElementById('btn-show-db-connect');
 const closeModals = document.querySelectorAll('.btn-close-modal');
 
 const hostNameInput = document.getElementById('host-name-input');
@@ -25,6 +30,23 @@ const hostStatus = document.getElementById('host-status');
 const joinPinInput = document.getElementById('join-pin-input');
 const btnExecuteJoin = document.getElementById('btn-execute-join');
 const joinStatus = document.getElementById('join-status');
+
+const dbInitPinInput = document.getElementById('db-init-pin-input');
+const btnExecuteDbInit = document.getElementById('btn-execute-db-init');
+const dbInitStatus = document.getElementById('db-init-status');
+
+const dbConnectPinInput = document.getElementById('db-connect-pin-input');
+const btnExecuteDbConnect = document.getElementById('btn-execute-db-connect');
+const dbConnectStatus = document.getElementById('db-connect-status');
+
+// DB Server Dashboard UI
+const serverDashboard = document.getElementById('server-dashboard');
+const mainChat = document.getElementById('main-chat');
+const serverPinDisplay = document.getElementById('server-pin-display');
+const serverPeersCount = document.getElementById('server-peers-count');
+const serverRoomsCount = document.getElementById('server-rooms-count');
+const serverLogs = document.getElementById('server-logs');
+const btnShutdownServer = document.getElementById('btn-shutdown-server');
 
 const chatRoomName = document.getElementById('chat-room-name');
 const chatRoomPin = document.getElementById('chat-room-pin');
@@ -57,12 +79,36 @@ let connections = []; // Array of active connections (for host)
 let hostConn = null; // Connection to host (for guest)
 let activeReply = null;
 
+// Database Server State
+const PREFIX_DB = 'nexus-db-';
+let isDbServer = false;
+let dbServerPeer = null;
+let dbServerConnections = [];
+let activeDbClientConn = null; // Used by clients to connect to DB Server
+let wakeLock = null;
+
 // The currently open room. Format: { id: 'local' | '1234', name: 'string', isHost: boolean }
 let currentRoom = null; 
 
-// --- Initialization ---
+// --- Boot & Event Listeners ---
 async function init() {
-    await refreshSidebar();
+    // Check if device is configured as a persistent DB server
+    if (localStorage.getItem('isDatabaseServer') === 'true') {
+        const savedPin = localStorage.getItem('databaseServerPin');
+        if (savedPin) {
+            mainChat.classList.add('hidden');
+            sidebar.classList.remove('open');
+            if (sidebarOverlay) sidebarOverlay.classList.add('hidden');
+            serverDashboard.classList.remove('hidden');
+            serverPinDisplay.textContent = savedPin;
+            isDbServer = true;
+            requestWakeLock();
+            startDbServer(savedPin);
+            return; // Halt normal chat initialization
+        }
+    }
+
+    refreshSidebar();
     
     // Auto-join via URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -90,25 +136,23 @@ sidebarOverlay.addEventListener('click', toggleSidebar);
 
 async function refreshSidebar() {
     storedRoomsList.innerHTML = '';
-    const keys = await localforage.keys();
     let roomsFound = 0;
-    
+
+    if (activeDbClientConn && activeDbClientConn.open) {
+        // Request rooms from DB server instead of local storage
+        activeDbClientConn.send({ cmd: 'GET_ROOMS' });
+        // The UI will update when the server responds via 'DB_ROOMS_LIST'
+        return; 
+    }
+
+    // Local P2P rooms
+    const keys = await localforage.keys();
     for (const key of keys) {
         if (key.startsWith('room_meta_')) {
             const meta = await localforage.getItem(key);
             if (meta && meta.id !== 'local') {
                 roomsFound++;
-                const div = document.createElement('div');
-                div.className = `room-item ${currentRoom && currentRoom.id === meta.id ? 'active' : ''}`;
-                div.innerHTML = `
-                    <div class="room-item-name">${meta.name}</div>
-                    <div class="room-item-meta">PIN: ${meta.id} | ${meta.isHost ? 'Host' : 'Guest'}</div>
-                `;
-                div.addEventListener('click', () => {
-                    openRoom(meta);
-                    if (window.innerWidth < 768) toggleSidebar();
-                });
-                storedRoomsList.appendChild(div);
+                renderSidebarRoom(meta);
             }
         }
     }
@@ -116,6 +160,20 @@ async function refreshSidebar() {
     if (roomsFound === 0) {
         storedRoomsList.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:10px;">No secured rooms yet.</div>';
     }
+}
+
+function renderSidebarRoom(meta) {
+    const div = document.createElement('div');
+    div.className = `room-item ${currentRoom && currentRoom.id === meta.id ? 'active' : ''}`;
+    div.innerHTML = `
+        <div class="room-item-name">${meta.name}</div>
+        <div class="room-item-meta">PIN: ${meta.id} | ${meta.isHost ? 'Host' : 'Guest'}</div>
+    `;
+    div.addEventListener('click', () => {
+        openRoom(meta);
+        if (window.innerWidth < 768) toggleSidebar();
+    });
+    storedRoomsList.appendChild(div);
 }
 
 btnNewLocal.addEventListener('click', () => {
@@ -151,17 +209,26 @@ async function openRoom(roomMeta) {
         await localforage.setItem(`room_meta_${roomMeta.id}`, roomMeta);
         
         // Start WebRTC based on role
-        if (roomMeta.isHost) {
-            startHosting(roomMeta.id);
+        if (activeDbClientConn && activeDbClientConn.open) {
+            // Tell DB Server we are entering this room to get sync
+            activeDbClientConn.send({ cmd: 'JOIN_ROOM', roomId: roomMeta.id });
+            updateStatus('online', 'CONNECTED TO DB SERVER');
         } else {
-            startJoining(roomMeta.id);
+            // P2P Fallback
+            if (roomMeta.isHost) {
+                startHosting(roomMeta.id);
+            } else {
+                startJoining(roomMeta.id);
+            }
         }
     }
     
-    // Load chat history
-    const history = await localforage.getItem(`messages_${roomMeta.id}`) || [];
-    history.forEach(msg => renderMessageObj(msg));
-    scrollToBottom();
+    if (!activeDbClientConn || !activeDbClientConn.open) {
+        // Load local chat history if not in DB mode
+        const history = await localforage.getItem(`messages_${roomMeta.id}`) || [];
+        history.forEach(msg => renderMessageObj(msg));
+        scrollToBottom();
+    }
     refreshSidebar();
     
     // Remove URL pin if present
@@ -205,10 +272,24 @@ btnShowHostModal.addEventListener('click', openHostModal);
 btnBannerSecure.addEventListener('click', openHostModal);
 btnShowJoinModal.addEventListener('click', openJoinModal);
 
+btnShowDbInit.addEventListener('click', () => {
+    modalDbInit.classList.remove('hidden');
+    dbInitPinInput.value = '';
+    if (window.innerWidth < 768 && sidebar.classList.contains('open')) toggleSidebar();
+});
+
+btnShowDbConnect.addEventListener('click', () => {
+    modalDbConnect.classList.remove('hidden');
+    dbConnectPinInput.value = '';
+    if (window.innerWidth < 768 && sidebar.classList.contains('open')) toggleSidebar();
+});
+
 closeModals.forEach(btn => {
     btn.addEventListener('click', () => {
         modalHost.classList.add('hidden');
         modalJoin.classList.add('hidden');
+        modalDbInit.classList.add('hidden');
+        modalDbConnect.classList.add('hidden');
     });
 });
 
@@ -231,7 +312,13 @@ btnExecuteHost.addEventListener('click', async () => {
     }
     
     const newRoom = { id: pin, name: name, isHost: true };
-    await localforage.setItem(`room_meta_${pin}`, newRoom);
+    
+    if (activeDbClientConn && activeDbClientConn.open) {
+        // Send create room command to DB Server
+        activeDbClientConn.send({ cmd: 'CREATE_ROOM', room: newRoom });
+    } else {
+        await localforage.setItem(`room_meta_${pin}`, newRoom);
+    }
     
     if (migrateHistory.length > 0) {
         await localforage.setItem(`messages_${pin}`, migrateHistory);
@@ -306,6 +393,9 @@ btnExecuteJoin.addEventListener('click', async () => {
     
     // Create guest room
     const newRoom = { id: pin, name: `Room ${pin}`, isHost: false };
+    if (activeDbClientConn && activeDbClientConn.open) {
+        activeDbClientConn.send({ cmd: 'CREATE_ROOM', room: newRoom });
+    }
     openRoom(newRoom);
 });
 
@@ -401,7 +491,9 @@ async function sendMessage() {
 
     // Transmit
     if (currentRoom.id !== 'local') {
-        if (currentRoom.isHost) {
+        if (activeDbClientConn && activeDbClientConn.open) {
+            activeDbClientConn.send({ cmd: 'MSG', roomId: currentRoom.id, msg: msgObj });
+        } else if (currentRoom.isHost) {
             connections.forEach(c => { if (c.open) c.send(msgObj); });
         } else if (hostConn && hostConn.open) {
             hostConn.send(msgObj);
@@ -427,7 +519,9 @@ async function sendFile(file) {
 
         if (currentRoom.id !== 'local') {
             const payload = { ...msgObj, sender: 'other' };
-            if (currentRoom.isHost) {
+            if (activeDbClientConn && activeDbClientConn.open) {
+                activeDbClientConn.send({ cmd: 'MSG', roomId: currentRoom.id, msg: payload });
+            } else if (currentRoom.isHost) {
                 connections.forEach(c => { if (c.open) c.send(payload); });
             } else if (hostConn && hostConn.open) {
                 hostConn.send(payload);
@@ -573,6 +667,217 @@ btnDeleteRoom.addEventListener('click', async () => {
         openRoom({ id: 'local', name: 'Local Scratchpad', isHost: false });
     }
 });
+
+// --- DATABASE SERVER LOGIC ---
+function logServer(msg) {
+    const d = document.createElement('div');
+    d.className = 'server-log';
+    d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    serverLogs.appendChild(d);
+    serverLogs.scrollTop = serverLogs.scrollHeight;
+}
+
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            logServer('Wake Lock acquired. Screen will not sleep.');
+            wakeLock.addEventListener('release', () => logServer('Wake Lock released.'));
+        } else {
+            logServer('Warning: Screen Wake Lock API not supported in this browser.');
+        }
+    } catch (err) {
+        logServer(`Wake Lock Error: ${err.name}, ${err.message}`);
+    }
+}
+
+btnExecuteDbInit.addEventListener('click', async () => {
+    const pin = dbInitPinInput.value.trim();
+    if (pin.length !== 4 || !/^\d+$/.test(pin)) {
+        dbInitStatus.textContent = 'Please enter a 4-digit Server PIN.';
+        return;
+    }
+    modalDbInit.classList.add('hidden');
+    
+    // Switch UI to Server Dashboard
+    mainChat.classList.add('hidden');
+    sidebar.classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.add('hidden');
+    serverDashboard.classList.remove('hidden');
+    serverPinDisplay.textContent = pin;
+    
+    isDbServer = true;
+    localStorage.setItem('isDatabaseServer', 'true');
+    localStorage.setItem('databaseServerPin', pin);
+    
+    requestWakeLock();
+    startDbServer(pin);
+});
+
+function startDbServer(pin) {
+    dbServerPeer = new Peer(PREFIX_DB + pin, { debug: 2 });
+    
+    dbServerPeer.on('open', async () => {
+        logServer(`DAEMON STARTED. Listening on ${PREFIX_DB}${pin}...`);
+        // Count total rooms
+        const keys = await localforage.keys();
+        let rooms = 0;
+        keys.forEach(k => { if (k.startsWith('room_meta_')) rooms++; });
+        serverRoomsCount.textContent = rooms;
+    });
+    
+    dbServerPeer.on('connection', (conn) => {
+        dbServerConnections.push(conn);
+        serverPeersCount.textContent = dbServerConnections.length;
+        logServer(`Client connected: ${conn.peer}`);
+        
+        conn.on('data', async (data) => {
+            if (data.cmd === 'GET_ROOMS') {
+                const keys = await localforage.keys();
+                let rooms = [];
+                for (let k of keys) {
+                    if (k.startsWith('room_meta_')) rooms.push(await localforage.getItem(k));
+                }
+                conn.send({ type: 'DB_ROOMS_LIST', rooms });
+                logServer(`Served global room list to ${conn.peer}`);
+            } 
+            else if (data.cmd === 'CREATE_ROOM') {
+                await localforage.setItem(`room_meta_${data.room.id}`, data.room);
+                logServer(`Created new room: ${data.room.name}`);
+                const keys = await localforage.keys();
+                let count = 0;
+                keys.forEach(k => { if (k.startsWith('room_meta_')) count++; });
+                serverRoomsCount.textContent = count;
+                
+                // Broadcast updated room list
+                let rooms = [];
+                for (let k of keys) {
+                    if (k.startsWith('room_meta_')) rooms.push(await localforage.getItem(k));
+                }
+                dbServerConnections.forEach(c => {
+                    if (c.open) c.send({ type: 'DB_ROOMS_LIST', rooms });
+                });
+            }
+            else if (data.cmd === 'JOIN_ROOM') {
+                const history = await localforage.getItem(`messages_${data.roomId}`) || [];
+                conn.send({ type: 'DB_ROOM_SYNC', roomId: data.roomId, history });
+                logServer(`Synced room ${data.roomId} to ${conn.peer}`);
+            }
+            else if (data.cmd === 'MSG') {
+                let messages = await localforage.getItem(`messages_${data.roomId}`) || [];
+                messages.push(data.msg);
+                await localforage.setItem(`messages_${data.roomId}`, messages);
+                
+                logServer(`Routed message in room ${data.roomId}`);
+                // Broadcast to all
+                dbServerConnections.forEach(c => {
+                    if (c.open) c.send({ type: 'DB_MSG_BROADCAST', roomId: data.roomId, msg: data.msg });
+                });
+            }
+        });
+        
+        conn.on('close', () => {
+            dbServerConnections = dbServerConnections.filter(c => c !== conn);
+            serverPeersCount.textContent = dbServerConnections.length;
+            logServer(`Client disconnected: ${conn.peer}`);
+        });
+    });
+}
+
+btnShutdownServer.addEventListener('click', () => {
+    if (confirm("Shut down the Database Server? All clients will disconnect.")) {
+        localStorage.removeItem('isDatabaseServer');
+        localStorage.removeItem('databaseServerPin');
+        if (wakeLock !== null) wakeLock.release();
+        if (dbServerPeer) dbServerPeer.destroy();
+        window.location.reload();
+    }
+});
+
+// --- DATABASE CLIENT LOGIC ---
+btnExecuteDbConnect.addEventListener('click', () => {
+    const pin = dbConnectPinInput.value.trim();
+    if (pin.length !== 4 || !/^\d+$/.test(pin)) {
+        dbConnectStatus.textContent = 'Invalid Server PIN.';
+        return;
+    }
+    
+    dbConnectStatus.textContent = 'Connecting...';
+    
+    // Connect to DB Server
+    const tempPeer = new Peer({ debug: 2 });
+    
+    tempPeer.on('open', () => {
+        activeDbClientConn = tempPeer.connect(PREFIX_DB + pin, { reliable: true });
+        
+        activeDbClientConn.on('open', () => {
+            modalDbConnect.classList.add('hidden');
+            alert('Successfully connected to Central Database Server!');
+            
+            // Fetch Global Rooms
+            activeDbClientConn.send({ cmd: 'GET_ROOMS' });
+            
+            // Clean UI
+            btnShowHostModal.classList.add('hidden');
+            btnShowJoinModal.classList.add('hidden');
+            btnShowDbConnect.textContent = `Connected: ${pin}`;
+            btnShowDbConnect.style.background = 'var(--primary)';
+        });
+        
+        activeDbClientConn.on('data', async (data) => {
+            if (data.type === 'DB_ROOMS_LIST') {
+                storedRoomsList.innerHTML = '';
+                if (data.rooms.length === 0) {
+                    storedRoomsList.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:10px;">Database empty.</div>';
+                } else {
+                    data.rooms.forEach(meta => renderSidebarRoom(meta));
+                }
+            }
+            else if (data.type === 'DB_ROOM_SYNC') {
+                if (currentRoom && currentRoom.id === data.roomId) {
+                    chatMessages.innerHTML = '';
+                    data.history.forEach(msg => {
+                        // Ensure sender logic maps correctly if viewing from another client
+                        renderMessageObj(msg);
+                    });
+                    scrollToBottom();
+                }
+            }
+            else if (data.type === 'DB_MSG_BROADCAST') {
+                if (currentRoom && currentRoom.id === data.roomId) {
+                    if (!document.getElementById(data.msg.id)) {
+                        // Force sender to 'other' if we didn't send it. 
+                        // Wait, if we sent it, it's already rendered locally with sender='self'. 
+                        // So any broadcast we don't have is from 'other'.
+                        const incomingMsg = { ...data.msg, sender: 'other' };
+                        renderMessageObj(incomingMsg);
+                    }
+                }
+            }
+        });
+        
+        activeDbClientConn.on('close', () => {
+            alert("Connection to Database Server lost.");
+            window.location.reload();
+        });
+        
+        activeDbClientConn.on('error', () => {
+            dbConnectStatus.textContent = 'Connection failed. Is the server online?';
+        });
+    });
+});
+
+// --- THEME CUSTOMIZATION LOGIC ---
+const themeSelector = document.getElementById('theme-selector');
+const savedTheme = localStorage.getItem('nexusTheme') || 'cyber';
+document.documentElement.setAttribute('data-theme', savedTheme);
+if (themeSelector) {
+    themeSelector.value = savedTheme;
+    themeSelector.addEventListener('change', (e) => {
+        document.documentElement.setAttribute('data-theme', e.target.value);
+        localStorage.setItem('nexusTheme', e.target.value);
+    });
+}
 
 // Boot
 init();
