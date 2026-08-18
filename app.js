@@ -225,24 +225,27 @@ function renderSidebarRoom(meta) {
     storedRoomsList.appendChild(div);
 }
 
-    // Removed local scratchpad init, all logic runs through DB now.
+async function openRoom(roomMeta) {
+    currentRoom = roomMeta;
+    
+    // Cleanup old connections
+    cleanupConnections();
+    
     chatMessages.innerHTML = '';
     cancelReply();
     
     // Update Header UI
     chatRoomName.textContent = roomMeta.name;
-    if (roomMeta.id === 'local') {
-        pinBadgeContainer.classList.add('hidden');
-        unsecuredBanner.classList.remove('hidden');
-        btnShareLink.classList.add('hidden');
-        btnDeleteRoom.classList.add('hidden'); // Optional: prevent deleting local
-        updateStatus('local', 'LOCAL SCRATCHPAD');
-    } else {
-        pinBadgeContainer.classList.remove('hidden');
-        chatRoomPin.textContent = roomMeta.id;
-        unsecuredBanner.classList.add('hidden');
-        btnShareLink.classList.remove('hidden');
-        btnDeleteRoom.classList.remove('hidden');
+      if (roomMeta.id === 'local') {
+          pinBadgeContainer.classList.add('hidden');
+          btnShareLink.classList.add('hidden');
+          btnDeleteRoom.classList.add('hidden'); // Optional: prevent deleting local
+          updateStatus('local', 'LOCAL SCRATCHPAD');
+      } else {
+          pinBadgeContainer.classList.remove('hidden');
+          chatRoomPin.textContent = roomMeta.id;
+          btnShareLink.classList.remove('hidden');
+          btnDeleteRoom.classList.remove('hidden');
         
         // Save meta to ensure it appears in sidebar
         await localforage.setItem(`room_meta_${roomMeta.id}`, roomMeta);
@@ -308,7 +311,6 @@ function openJoinModal() {
 }
 
 btnShowHostModal.addEventListener('click', openHostModal);
-btnBannerSecure.addEventListener('click', openHostModal);
 btnShowJoinModal.addEventListener('click', openJoinModal);
 
 btnShowDbInit.addEventListener('click', () => {
