@@ -45,10 +45,12 @@ Because it requires absolutely **zero backend infrastructure**, it can be hosted
 
 - 🟢 **Zero-Server Architecture**: Pure Peer-to-Peer (P2P) communication powered by `PeerJS` and WebRTC.
 - 💾 **"Device-as-a-Server" Persistence**: Uses `localforage` (IndexedDB) to permanently store chat history and files locally on the hosting device. If you close the app and return days later, your data is exactly where you left it.
-- 🔄 **Instant Auto-Sync**: When a guest device joins a room, the host device automatically packages the entire IndexedDB history and syncs it to the guest in milliseconds.
-- 🎨 **Sleek "Cyber-Tech" UI**: A dark-mode, matrix-green hacker aesthetic combined with the familiar, user-friendly layout of modern chat apps (like WhatsApp).
-- 📎 **Unrestricted File Sharing**: Send PDFs, images, and documents securely without arbitrary cloud-provider file size limits. 
-
+- 📱 **WhatsApp-Style Threading**: Native chat experience including **Swipe-to-Reply** on mobile (or double-click on PC), quoted message blocks, and click-to-scroll navigation.
+- 🔐 **Custom Secure Enclaves**: Ditch random IDs. You can create multiple secure rooms, choose your own Room Names, and set your own Custom 4-Digit PINs.
+- 🗂️ **Persistent Sidebar**: Seamlessly switch between multiple ongoing rooms using the slide-out sidebar, just like a native messaging app.
+- ⚡ **Frictionless Sharing**: One-click "Share Link" generates a magic URL (`?pin=XXXX`) that automatically connects and joins guests without them needing to type a password.
+- 📝 **Local Scratchpad**: App opens instantly into an offline note-taking mode. Type notes or drop files immediately, and optionally secure/host them later without losing history.
+- 📥 **Native "Save to Device"**: Bypass the browser viewer; files download directly to your Android, tablet, or iOS filesystem via native HTML5 download handling.
 ---
 
 ## 🛠️ Under the Hood (For the Tech-Savvy)
@@ -71,17 +73,20 @@ Since NexusDrop is purely static, you can run it right now without installing a 
    ```bash
    git clone https://github.com/yourusername/NexusDrop.git
    ```
-2. **Run Locally:**
-   Simply double-click `index.html` to open it in your browser.
-3. **Host a Room:**
-   - Click **Initialize Server** on Device A. 
-   - Note the generated 4-digit PIN.
-4. **Join a Room:**
-   - Open the app on Device B.
-   - Enter the 4-digit PIN and click **Connect**.
-   - Watch the UI instantly sync your chat history!
+2. **Run Locally or via GitHub Pages:**
+   Simply double-click `index.html` to open it in your browser, or host it on GitHub Pages for global access.
+3. **The Local Scratchpad:**
+   - The app instantly opens to a functional chat interface. Drop files and type notes immediately. Everything is saved to your local browser.
+4. **Host a Secure Room:**
+   - Click the warning banner at the top to secure your scratchpad.
+   - Enter a **Room Name** and choose a **Custom 4-digit PIN**.
+   - Your local scratchpad history automatically migrates to the secure room!
+5. **Join a Room:**
+   - On Device B, open the sidebar and click **Join Room**.
+   - Enter the custom PIN.
+   - Watch the UI instantly sync your chat history! (Or, just click a "Shared Link" from the host to bypass typing the PIN entirely).
 
-> **Note on Persistence**: To access files from Device B at a later date, Device A (the Host) must have the NexusDrop tab open to facilitate the P2P WebRTC handshake.
+> **Note on Persistence**: To access files from Device B at a later date, Device A (the Host) must have the NexusDrop tab open to facilitate the P2P WebRTC handshake. Your joined rooms will automatically save to your Sidebar for easy switching.
 
 ---
 

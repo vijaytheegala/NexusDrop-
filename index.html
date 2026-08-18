@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SECURE.TERMINAL // DROP_ROOM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Secure Drop</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Google Fonts for modern tech aesthetic -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
@@ -13,72 +13,81 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
 </head>
 <body>
-    <div id="app">
-        <!-- Login / Landing Screen -->
-        <div id="landing-screen" class="screen active">
-            <div class="terminal-header">
-                <h1>Secure Drop</h1>
-                <p class="subtitle">Encrypted P2P Local Node</p>
+    <div id="app" class="app-layout">
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h1>NexusDrop</h1>
+                <button id="btn-close-sidebar" class="btn-icon mobile-only">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             
-            <div class="action-container">
-                <div class="host-section box">
-                    <h2>Host a Room</h2>
-                    <p>Create a persistent secure enclave.</p>
-                    <input type="text" id="room-name-input" placeholder="Room Name (e.g. ALPHA)">
-                    <button id="btn-host" class="btn primary">Initialize Server</button>
-                    <!-- Display existing rooms if any -->
-                    <div id="existing-rooms-container" class="hidden">
-                        <h3>> STORED_ROOMS</h3>
-                        <div id="stored-rooms-list"></div>
-                    </div>
-                </div>
+            <div class="sidebar-actions">
+                <button id="btn-show-host-modal" class="btn primary btn-sm">Host Room</button>
+                <button id="btn-show-join-modal" class="btn secondary btn-sm">Join Room</button>
+            </div>
 
-                <div class="divider"><span>// OR //</span></div>
-
-                <div class="join-section box">
-                    <h2>Join a Room</h2>
-                    <p>Enter access PIN to sync data.</p>
-                    <div class="input-group">
-                        <input type="text" id="pin-input" placeholder="XXXX" maxlength="4" pattern="\d*">
-                        <button id="btn-join" class="btn secondary">Connect</button>
-                    </div>
+            <div class="sidebar-rooms">
+                <h3>> YOUR_ROOMS</h3>
+                <div id="stored-rooms-list" class="room-list">
+                    <!-- Rooms injected here -->
                 </div>
             </div>
-            <div id="connection-status" class="status-msg"></div>
-        </div>
-
-        <!-- Waiting for Peer Screen -->
-        <div id="waiting-screen" class="screen">
-            <div class="box">
-                <h1>Room Initialized</h1>
-                <p>ROOM NAME: <span id="display-room-name" class="highlight"></span></p>
-                <p>ACCESS PIN:</p>
-                <div class="pin-display" id="display-pin">----</div>
-                <p class="waiting-text blink">Waiting for peer connection...</p>
-                <button id="btn-cancel-waiting" class="btn secondary" style="margin-top:20px;">Abort</button>
+            
+            <div class="sidebar-footer">
+                <button id="btn-new-local" class="btn secondary btn-sm" style="width:100%; font-size:0.8rem;">+ New Local Scratchpad</button>
             </div>
-        </div>
+        </aside>
 
-        <!-- Chat / Share Screen -->
-        <div id="chat-screen" class="screen chat-layout">
+        <!-- Main Chat Area -->
+        <main id="main-chat" class="main-chat">
+            
+            <!-- Unsecured Warning Banner -->
+            <div id="unsecured-banner" class="unsecured-banner">
+                <span class="warning-icon">⚠️</span>
+                <span>You haven't secured this chat.</span>
+                <button id="btn-banner-secure" class="btn-text">Secure & Host</button>
+            </div>
+
             <div class="chat-header">
                 <div class="room-info">
-                    <h2><span id="chat-room-name">UNKNOWN</span> <span class="pin-badge">PIN: <span id="chat-room-pin"></span></span></h2>
-                    <div class="status-indicator"><span class="status-dot"></span> <span id="peer-status">WAITING...</span></div>
+                    <button id="btn-toggle-sidebar" class="btn-icon hamburger">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                    <h2>
+                        <span id="chat-room-name">Local Scratchpad</span> 
+                        <span id="pin-badge-container" class="pin-badge hidden">PIN: <span id="chat-room-pin"></span></span>
+                    </h2>
+                    <div class="status-indicator">
+                        <span class="status-dot"></span> 
+                        <span id="peer-status">OFFLINE (LOCAL ONLY)</span>
+                    </div>
                 </div>
                 <div class="header-actions">
+                    <button id="btn-share-link" class="btn-icon hidden" title="Copy Room Link">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    </button>
                     <button id="btn-delete-room" class="btn-icon danger hidden" title="Wipe Database">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                    <button id="btn-leave" class="btn-icon" title="Disconnect">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     </button>
                 </div>
             </div>
             
             <div class="chat-messages" id="chat-messages">
                 <!-- Messages go here -->
+            </div>
+
+            <!-- Reply Preview Area -->
+            <div id="reply-preview" class="hidden">
+                <div class="reply-preview-content">
+                    <span class="reply-preview-sender" id="reply-preview-sender"></span>
+                    <span class="reply-preview-text" id="reply-preview-text"></span>
+                </div>
+                <button id="btn-cancel-reply" class="btn-icon" title="Cancel Reply">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
 
             <!-- Bottom Input Bar (WhatsApp style) -->
@@ -92,7 +101,59 @@
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
             </div>
+        </main>
+
+        <!-- Sidebar Overlay (Mobile) -->
+        <div id="sidebar-overlay" class="overlay hidden"></div>
+
+        <!-- Modals -->
+        <div id="modal-host" class="modal hidden">
+            <div class="modal-content box">
+                <div class="modal-header">
+                    <h2>Secure & Host Room</h2>
+                    <button class="btn-icon btn-close-modal">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <p>Convert this local scratchpad into a secure enclave. Choose a Room Name and a Custom 4-Digit PIN.</p>
+                <div class="input-group-col">
+                    <label for="host-name-input">Room Name</label>
+                    <input type="text" id="host-name-input" placeholder="e.g. PROJECT_ALPHA" maxlength="20">
+                    
+                    <label for="host-pin-input">Custom 4-Digit PIN</label>
+                    <input type="text" id="host-pin-input" placeholder="e.g. 1234" maxlength="4" pattern="\d*">
+                </div>
+                <button id="btn-execute-host" class="btn primary" style="margin-top: 16px;">Initialize Server</button>
+                <div id="host-status" class="status-msg"></div>
+            </div>
         </div>
+
+        <div id="modal-join" class="modal hidden">
+            <div class="modal-content box">
+                <div class="modal-header">
+                    <h2>Join Room</h2>
+                    <button class="btn-icon btn-close-modal">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <p>Enter the access PIN to sync data from the host.</p>
+                <div class="input-group-col">
+                    <label for="join-pin-input">Access PIN</label>
+                    <input type="text" id="join-pin-input" placeholder="XXXX" maxlength="4" pattern="\d*" style="text-align: center; letter-spacing: 4px; font-weight: 600; font-family: var(--font-mono);">
+                </div>
+                <button id="btn-execute-join" class="btn secondary" style="margin-top: 16px;">Connect</button>
+                <div id="join-status" class="status-msg"></div>
+            </div>
+        </div>
+
+        <!-- Image Lightbox Overlay -->
+        <div id="lightbox" class="lightbox hidden">
+            <button id="btn-close-lightbox" class="btn-icon lightbox-close">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <img id="lightbox-img" src="" alt="Full Screen Preview">
+        </div>
+
     </div>
     <script src="app.js"></script>
 </body>
