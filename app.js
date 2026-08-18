@@ -7,9 +7,9 @@ const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
 const btnCloseSidebar = document.getElementById('btn-close-sidebar');
 const storedRoomsList = document.getElementById('stored-rooms-list');
 
-const initialBootUi = document.getElementById('initial-boot-ui');
-const bootBtnConnect = document.getElementById('boot-btn-connect');
-const bootBtnInit = document.getElementById('boot-btn-init');
+const initialBootUi = null; // Removed
+const bootBtnConnect = null; // Removed
+const bootBtnInit = null; // Removed
 
 const dbInitNameInput = document.getElementById('db-init-name-input');
 const knownDbsSelect = document.getElementById('known-dbs-select');
@@ -25,6 +25,8 @@ const modalDbConnect = document.getElementById('modal-db-connect');
 
 const btnShowHostModal = document.getElementById('btn-show-host-modal');
 const btnShowJoinModal = document.getElementById('btn-show-join-modal');
+const btnShowDbInit = document.getElementById('btn-show-db-init');
+const btnShowDbConnect = document.getElementById('btn-show-db-connect');
 const closeModals = document.querySelectorAll('.btn-close-modal');
 
 const hostNameInput = document.getElementById('host-name-input');
@@ -115,16 +117,6 @@ function populateKnownDbs() {
     }
 }
 
-bootBtnConnect.addEventListener('click', () => {
-    initialBootUi.classList.add('hidden');
-    modalDbConnect.classList.remove('hidden');
-});
-
-bootBtnInit.addEventListener('click', () => {
-    initialBootUi.classList.add('hidden');
-    modalDbInit.classList.remove('hidden');
-});
-
 async function init() {
     if (localStorage.getItem('isDatabaseServer') === 'true') {
         const savedPin = localStorage.getItem('databaseServerPin');
@@ -141,12 +133,8 @@ async function init() {
         }
     }
     
-    // Force Initial Boot UI if not a DB
-    if(initialBootUi) {
-        initialBootUi.classList.remove('hidden');
-        populateKnownDbs();
-    }
-
+    // Boot into standard chat
+    openRoom({ id: 'local', name: 'Local Scratchpad', isHost: false });
     refreshSidebar();
     
     // Auto-join via URL
@@ -323,6 +311,19 @@ btnShowHostModal.addEventListener('click', openHostModal);
 btnBannerSecure.addEventListener('click', openHostModal);
 btnShowJoinModal.addEventListener('click', openJoinModal);
 
+btnShowDbInit.addEventListener('click', () => {
+    modalDbInit.classList.remove('hidden');
+    dbInitPinInput.value = '';
+    if (window.innerWidth < 768 && sidebar.classList.contains('open')) toggleSidebar();
+});
+
+btnShowDbConnect.addEventListener('click', () => {
+    modalDbConnect.classList.remove('hidden');
+    dbConnectPinInput.value = '';
+    populateKnownDbs();
+    if (window.innerWidth < 768 && sidebar.classList.contains('open')) toggleSidebar();
+});
+
 closeModals.forEach(btn => {
     btn.addEventListener('click', () => {
         modalHost.classList.add('hidden');
@@ -340,13 +341,13 @@ btnExecuteHost.addEventListener('click', () => {
     if (!name || pin.length !== 4) return;
     
     const newRoom = { id: pin, name: name, isHost: true };
+    modalHost.classList.add('hidden');
     
     if (activeDbClientConn && activeDbClientConn.open) {
         activeDbClientConn.send({ cmd: 'CREATE_ROOM', room: newRoom });
-        modalHost.classList.add('hidden');
-    } else {
-        hostStatus.textContent = 'You must be connected to a Database Server first.';
     }
+    
+    openRoom(newRoom);
 });
 
 function startHosting(pin) {
@@ -412,11 +413,8 @@ btnExecuteJoin.addEventListener('click', async () => {
     }
     modalJoin.classList.add('hidden');
     
-    // Create guest room
     const newRoom = { id: pin, name: `Room ${pin}`, isHost: false };
-    if (activeDbClientConn && activeDbClientConn.open) {
-        activeDbClientConn.send({ cmd: 'CREATE_ROOM', room: newRoom });
-    }
+    
     openRoom(newRoom);
 });
 
@@ -841,11 +839,16 @@ btnExecuteDbConnect.addEventListener('click', () => {
                 localStorage.setItem('knownDatabases', JSON.stringify(dbs));
             }
             
-            mainChat.classList.remove('hidden'); // CRITICAL FIX
+            mainChat.classList.remove('hidden'); // Ensure chat is visible
             alert('Successfully connected to Central Database Server!');
             
             // Fetch Global Rooms
             activeDbClientConn.send({ cmd: 'GET_ROOMS' });
+            
+            if(btnShowDbConnect) {
+                btnShowDbConnect.textContent = `Connected: ${pin}`;
+                btnShowDbConnect.style.background = 'var(--primary)';
+            }
         });
         
         activeDbClientConn.on('data', async (data) => {

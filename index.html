@@ -42,12 +42,15 @@
             <button id="btn-show-host-modal" class="btn secondary btn-sm" style="flex: 1;">Create Room</button>
             <button id="btn-show-join-modal" class="btn secondary btn-sm" style="flex: 1;">Join Room</button>
         </div>
-
-            <div class="sidebar-rooms" id="stored-rooms-list">
+        
+        <div class="sidebar-rooms" id="stored-rooms-list">
             <!-- Room list -->
         </div>
-        
-        <!-- Bottom section removed for simplicity, handled by Initial Boot Screen -->
+
+        <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
+            <button id="btn-show-db-connect" class="btn secondary btn-sm" style="width: 100%;">Connect to DB Server</button>
+            <button id="btn-show-db-init" class="btn secondary btn-sm" style="width: 100%; border-color: var(--warning); color: var(--warning);">Initialize DB Server Mode</button>
+        </div>
         </aside>
 
         <!-- Server Dashboard Area (Hidden by default) -->
@@ -79,7 +82,7 @@
         </main>
 
         <!-- Main Chat Area -->
-        <main id="main-chat" class="main-chat hidden">
+        <main id="main-chat" class="main-chat">
             
             <div class="chat-header">
                 <div class="header-left" style="display: flex; align-items: center; gap: 12px;">
@@ -139,17 +142,6 @@
         <div id="sidebar-overlay" class="overlay hidden"></div>
 
         <!-- Modals -->
-        <!-- Initial Boot Screen -->
-        <div id="initial-boot-ui" class="overlay" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: var(--bg-color);">
-            <div class="modal-content box" style="text-align: center; max-width: 400px; border-color: var(--primary);">
-                <h1 style="color: var(--primary); margin-bottom: 10px;">NexusDrop</h1>
-                <p style="margin-bottom: 30px; color: var(--text-muted);">Welcome. Please choose your device role to continue.</p>
-                
-                <button id="boot-btn-connect" class="btn primary" style="width: 100%; margin-bottom: 15px; padding: 15px; font-size: 1.1rem;">Connect to Database Server</button>
-                <button id="boot-btn-init" class="btn secondary" style="width: 100%; padding: 15px; font-size: 1.1rem; border-color: var(--warning); color: var(--warning);">Make this device a Database</button>
-            </div>
-        </div>
-
         <div id="modal-host" class="modal hidden">
             <div class="modal-content box">
                 <div class="modal-header">
